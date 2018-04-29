@@ -136,7 +136,7 @@ p <- ggplot(data = placement_scores_by_course, aes(x = course_level, y = mean, f
 p + geom_bar(stat = "identity", position = dodge) +
   geom_errorbar(limits, position = dodge, width = 0.25) +
   ggtitle("Mean Placement Score by Current Course Level", subtitle="(passing course grades only)") +
-  theme(legend.position = "none") + 
+  theme(legend.position = "none") #+ 
   #geom_hline(yintercept=c(18.5, 22.5, 27.5, 35.5))
   #geom_hline(yintercept=c(20, 25, 35))
   #theme(axis.text.x=element_blank(), axis.ticks.x=element_blank(),
@@ -162,15 +162,20 @@ for(i in 1:length(course_levels)){
   d[(d$course_level==course_levels[i] & d$pass==0), 'placement_level'] = i
   d[(d$course_level==course_levels[i] & d$pass==1), 'placement_level'] = i+1
 }
-
 d$placement_level = as.ordered(d$placement_level)
 d$placement_level
 unique(d[,c('course_level', 'pass', 'placement_level')])
 
-d[, list(mean_placement_score=mean(placement_score)), by=c('course_level')]
+d[pass==1, list(mean_placement_score=mean(placement_score), median_placement_score=median(placement_score), min=min(placement_score), max=max(placement_score)), by=c('course_level')]
 d[, list(mean_placement_score=mean(placement_score)), by=c('course_level', 'pass')]
-d[, list(mean_placement_score=mean(placement_score)), by=c('placement_level')]
+d[, list(mean_placement_score=median(placement_score)), by=c('placement_level')]
 
+
+#d[, list(mean_placement_score=median(placement_score)), by=c('placement_level')]
+
+
+# set comparison group
+#d$comparison = as.numeric(d$placement_level) + as.numeric(d$placement_level) %% 2 - 1
 
 # overlapping histograms [all]
 d.level = d[d$course_level==course_levels[1],]
@@ -198,6 +203,8 @@ for(i in 1:(length(course_levels)-1)){
 # cut scores (eyeballing): 20, 25, 35       [normalized]
 # cut scores (eyeballing): 20, 25, 35       [normalized and excluding outliers]
 
+
+
 placement_levels = levels(d$placement_level)
 # overlapping histograms [pairwise]
 for(i in 1:(length(placement_levels)-1)){
@@ -211,6 +218,41 @@ for(i in 1:(length(placement_levels)-1)){
 
 # cut scores (eyeballing): 20, 20, 35, 35
 
+# Densities and line estimates
+placement_levels = levels(d$placement_level)
+bw = 3
+# overlapping histograms [pairwise]
+for(i in 1:(length(placement_levels)-1)){
+  d.level = d[d$placement_level==placement_levels[i],]
+  hist(d.level$placement_score, right=T, prob=T, breaks=seq(0,60,3), col=rgb(1,0,0,0.5),xlim=c(0,60), ylim=c(0,.1), main=paste("Placement Level", placement_levels[i], 'vs', placement_levels[i+1]), xlab="Placement Score")
+  lines(density(d.level$placement_score, bw=bw), col="red", lwd=2)
+  d.level = d[d$placement_level==placement_levels[i+1],]
+  hist(d.level$placement_score, right=T, prob=T, breaks=seq(0,60,3), col=rgb(0,0,1,0.5), add=T)
+  lines(density(d.level$placement_score, bw=bw), col="blue", lwd=2)
+  box()
+  abline(v=cut_scores[i])
+}
+
+# fitting normal curves
+placement_levels = levels(d$placement_level)
+hist_width = 4
+for(i in 1:(length(placement_levels)-1)){
+  d.level = d[d$placement_level==placement_levels[i],]
+  hist(d.level$placement_score, right=T, prob=T, breaks=seq(0,60,hist_width), col=rgb(1,0,0,0.5),xlim=c(0,60), ylim=c(0,.1), main=paste("Placement Level", placement_levels[i], 'vs', placement_levels[i+1]), xlab="Placement Score")
+  xfit<-seq(0, 60) 
+  yfit<-dnorm(xfit,mean=mean(d.level$placement_score),sd=sd(d.level$placement_score)) 
+  lines(xfit, yfit, col="red", lwd=2)
+  
+  d.level = d[d$placement_level==placement_levels[i+1],]
+  hist(d.level$placement_score, right=T, prob=T, breaks=seq(0,60,hist_width), col=rgb(0,0,1,0.5), add=T)
+  xfit<-seq(0, 60) 
+  yfit<-dnorm(xfit,mean=mean(d.level$placement_score),sd=sd(d.level$placement_score)) 
+  lines(xfit, yfit, col="blue", lwd=2)
+  box()
+  abline(v=cut_scores[i])
+}
+
+ggplot(d[placement_level!=1]) + geom_density(aes(x = placement_score, fill = placement_level), alpha = 0.2)
 
 # boxplots of placement_score by placement_level
 ggplot(d, aes(x = placement_level, y = placement_score)) +
@@ -233,7 +275,7 @@ p + geom_bar(stat = "identity", position = dodge) +
   geom_errorbar(limits, position = dodge, width = 0.25) +
   theme(legend.position = "none") +
   ggtitle("Mean Placement Score by Placement Level") +
-  geom_hline(yintercept=c(18.5, 22.5, 27.5, 35.5))
+  geom_hline(yintercept=cut_scores)
   #geom_hline(yintercept=c(15, 22.5, 27, 35))
 #theme(axis.text.x=element_blank(), axis.ticks.x=element_blank(),
 #axis.title.x=element_blank())
